@@ -1,4 +1,7 @@
-# Top secret repository to hide from the scientific community 🕵️
+This repository is part of the UEF Breast Cancer Group’s initiative to estimate breast density from mammograms using deep learning. As participants in the Kaggle Breast Density Prediction competition, we extended the MTLSegNet architecture, focusing on optimizing segmentation of breast and dense tissues. Key contributions include implementing DSC++ loss functions, AdamW optimizers, and leveraging the CSC Puhti supercomputer for training. Puhti enabled us to efficiently run large-scale experiments and hyperparameter tuning, significantly reducing training time and allowing simultaneous model evaluations. Our final model achieved a competitive third place in the challenge, with a best MAE of 7.19 on the public dataset. Further improvements such as advanced augmentations and hyperparameter tuning were made to increase robustness and reduce overfitting. This project exemplifies practical applications of AI in medical imaging, aiming to support radiologists by automating dense tissue segmentation in mammograms.
+
+
+
 
 ## Deepdensity  
 # UEF Breast Cancer Group - Challenge
