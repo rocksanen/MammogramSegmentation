@@ -133,6 +133,10 @@ class Config:
     ce_ratio: float = 0.5
     smooth: float = 1.0
 
+    #comboloss
+    alpha: float = 0.5
+    beta: float = 0.5
+
     def __post_init__(self):
         self = load_config_from_env(self)
         self = load_config_from_args(self)

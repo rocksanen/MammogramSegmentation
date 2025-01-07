@@ -46,42 +46,48 @@ class DiceLoss(base.Loss):
 
 
 class DSCPlusPlusLoss(base.Loss):
-    def __init__(self, eps=1e-5, beta=0.8, gamma=2.6, activation=None, ignore_channels=None):
+    def __init__(self, eps=1e-7, beta=2.1208, gamma=1.554, activation=None, ignore_channels=None):
         super().__init__()
-        self.eps = eps
-        self.beta = beta
-        self.gamma = gamma
-        self.activation = Activation(activation)
-        self.ignore_channels = ignore_channels
+        # Alustetaan menetelmän parametrit
+        self.eps = eps  # Pieni luku jakolaskun nollalla jaolla välttämiseksi
+        self.beta = beta  # Beta-parametri menetelmän laskukaavassa
+        self.gamma = gamma  # Gamma-parametri menetelmän laskukaavassa
+        self.activation = Activation(activation)  # Aktivointifunktio 
+        self.ignore_channels = ignore_channels  # Kanavat, joita ei huomioida menetelmässä
 
     def forward(self, y_pr, y_gt):
-        y_pr = self.activation(y_pr)
 
-        C = y_pr.size(1)  # Number of classes
-        loss = 0.0
+        y_pr = self.activation(y_pr)  # Aktivoidaan ennusteet
+
+        C = y_pr.size(1)  # Luokkien lukumäärä
+        loss = 0.0  # Alustetaan menetelmän kokonaistappio
 
         for c in range(C):
+            # Käydään läpi jokainen luokka
             if self.ignore_channels is not None and c in self.ignore_channels:
-                continue
+                continue  # Jos kanava on määritelty ohitettavaksi, siirry seuraavaan
 
-            y_true_c = y_gt[:, c, ...]
-            y_pred_c = y_pr[:, c, ...]
+            y_true_c = y_gt[:, c, ...]  # Todellinen arvo luokalle c
+            y_pred_c = y_pr[:, c, ...]  # Ennustettu arvo luokalle c
 
-            tp = torch.sum(y_pred_c * y_true_c, dim=[0, 1, 2])
-            fp = torch.sum(y_pred_c * (1 - y_true_c), dim=[0, 1, 2])
-            fn = torch.sum((1 - y_pred_c) * y_true_c, dim=[0, 1, 2])
+            tp = torch.sum(y_pred_c * y_true_c, dim=[0, 1, 2])  # True positive -arvot
+            fp = torch.sum(y_pred_c * (1 - y_true_c), dim=[0, 1, 2])  # False positive -arvot
+            fn = torch.sum((1 - y_pred_c) * y_true_c, dim=[0, 1, 2])  # False negative -arvot
 
+            # Painotetaan virheitä gamma-parametrilla
             fp = fp * ((1 - y_true_c) ** self.gamma)
             fn = fn * ((1 - y_pred_c) ** self.gamma)
 
+            # Lasketaan häviön etäisyys
             numerator = (1 + self.beta**2) * tp + self.eps
             denominator = (1 + self.beta**2) * tp + self.beta**2 * fn + fp + self.eps
 
-            class_loss = 1 - numerator / denominator
-            loss += class_loss
+            class_loss = 1 - numerator / denominator  # Luokan häviö
+            loss += class_loss  # Päivitetään kokonaishäviö
 
-        final_loss = loss.mean()  # Reducing the loss to a scalar
-        return final_loss
+        final_loss = loss.mean()  # Lasketaan keskimääräinen häviö
+        return final_loss  # Palautetaan lopullinen häviö
+
 
 
 class TverskyLoss(base.Loss):
@@ -249,49 +255,29 @@ which is modulated by the ALPHA and CE_RATIO parameters to balance the contribut
 and cross-entropy components to the final loss value.
 
 """
-class ComboLoss(base.Loss):
-    def __init__(self, alpha, beta, smooth=None, ce_ratio=None, weight=None, size_average=True):
-        super(ComboLoss, self).__init__()
-        self.alpha = alpha # weight parameter for the Dice loss
-        self.beta = beta
-        self.weight = weight
-        self.size_average = size_average
-        #self.smooth = smooth
-        #self.ce_ratio = ce_ratio
-        self.K_smooth = 1
-        self.K_ce_ratio = 0.4
-        
-        self.eps=1e-7
-        # weight parameter for weighted cross-entropy loss
-        # size_average to average the loss over the batch
+#PyTorch
+ALPHA = 0.7 # < 0.5 penalises FP more, > 0.5 penalises FN more
+CE_RATIO = 0.1 #weighted contribution of modified CE loss compared to Dice loss
 
-    def forward(self, inputs, targets):
-        # Calculate the Combo loss given the inputs and targets,
-        # where 'inputs' are the predicted probabilities from the model
-        # and 'targets' are the true labels.
+class ComboLoss(base.Loss):
+    def __init__(self, weight=None, size_average=True):
+        super(ComboLoss, self).__init__()
+
+    def forward(self, inputs, targets, smooth=1, alpha=ALPHA, beta=BETA, eps=1e-9):
         
-        # Flatten the input and target tensors to ensure the calculation is done
-        # on the same dimensions.
+        #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
         
-        # Calculate the True Positives (intersection) for the Dice score.
+        #True Positives, False Positives & False Negatives
         intersection = (inputs * targets).sum()    
-        # Calculate the Dice score, which is a measure of overlap between the
-        # predicted segmentation and the ground truth. 
-        dice = (2. * intersection + self.K_smooth) / (inputs.sum() + targets.sum() + self.K_smooth)
+        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
         
-        # Clamp the inputs to avoid log(0) which would result in NaN.
-        # 'e' should be a small constant (e.g., 1e-7).
-        inputs = torch.clamp(inputs, self.eps, 1.0 - self.eps)       
-        # Calculate the weighted cross-entropy loss.
-        out = - (self.alpha * ((targets * torch.log(inputs)) + ((1 - self.alpha) * (1.0 - targets) * torch.log(1.0 - inputs))))
-        # Take the mean of the weighted cross-entropy loss across all observations.
+        inputs = torch.clamp(inputs, eps, 0.001 - eps)       
+        out = - (ALPHA * ((targets * torch.log(inputs)) + ((1 - ALPHA) * (1.0 - targets) * torch.log(1.0 - inputs))))
         weighted_ce = out.mean(-1)
-        # Combine the weighted cross-entropy loss with the Dice loss.
-        combo = (self.K_ce_ratio * weighted_ce) + ((1 - self.K_ce_ratio) * dice)
+        combo = (CE_RATIO * weighted_ce) - ((1 - CE_RATIO) * dice)
         
-        # Return the combined loss.
         return combo
     
 #UNDER CONSTRUCTION-----------------LOVAZ SOFTMAX LETS START DATING---------------
