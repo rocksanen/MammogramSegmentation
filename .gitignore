@@ -12,7 +12,7 @@ data_original/*
 .ignore/**
 .env
 scr/autoalbument-config-search-cifar10/outputs/*
-# ------------------------------------------
+# -----------------------------------------
 
 # Byte-compiled / optimized / DLL files
 **/__pycache__/
@@ -20,7 +20,7 @@ scr/autoalbument-config-search-cifar10/outputs/*
 *$py.class
 *.pyc
 
-# ------------------------------------------
+# -----------------------------------------
 
 # Ignore everything in the subfolders
 /test_output/evaluation/*
